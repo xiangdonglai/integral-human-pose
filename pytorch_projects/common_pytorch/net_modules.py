@@ -1,8 +1,10 @@
 import os
+import json
 import torch
 import logging
 import numpy as np
 import pickle
+import cv2
 
 from common.speedometer import BatchEndParam
 from common.utility.image_processing_cv import trans_coords_from_patch_to_org_3d
@@ -12,6 +14,8 @@ from torch.nn.parallel.scatter_gather import gather
 
 from common_pytorch.common_loss.loss_recorder import LossRecorder
 from common.utility.image_processing_cv import flip
+
+connMat = np.array([[0, 1], [1, 2], [2, 3], [0, 4], [4, 5], [5, 6], [0, 7], [7, 8], [8, 9], [9, 10], [8, 11], [11, 12], [12, 13], [8, 14], [14, 15], [15, 16]])
 
 
 def trainNet(nth_epoch, train_data_loader, network, optimizer, loss_config, loss_func, speedometer=None):
@@ -86,17 +90,21 @@ def validNet(valid_data_loader, network, loss_config, result_func, loss_func, me
     preds_in_patch_with_score = []
     with torch.no_grad():
         for idx, _data in enumerate(valid_data_loader):
+            print('{} / {}'.format(idx, len(valid_data_loader)))
             batch_data = _data[0]
 
             if batch_data.shape[1] != 3:
                 flip_test = False
 
-            batch_label = _data[1]
-            batch_label_weight = _data[2]
+            # batch_label = _data[1]
+            # batch_label_weight = _data[2]
+
+            image = np.transpose(batch_data.cpu().numpy()[0, :, :], [1, 2, 0])
+            image = (np.array([58.395, 57.120, 57.375]) * image + np.array([123.675, 116.280, 103.530])).astype(np.uint8)
 
             batch_data = batch_data.cuda()
-            batch_label = batch_label.cuda()
-            batch_label_weight = batch_label_weight.cuda()
+            # batch_label = batch_label.cuda()
+            # batch_label_weight = batch_label_weight.cuda()
 
             preds = network(batch_data)
 
@@ -107,11 +115,11 @@ def validNet(valid_data_loader, network, loss_config, result_func, loss_func, me
             del batch_data
 
             # loss
-            loss = loss_func(preds, batch_label, batch_label_weight)
-            del batch_label
+            # loss = loss_func(preds, batch_label, batch_label_weight)
+            # del batch_label
 
-            loss_recorder.update(loss.detach(), valid_data_loader.batch_size)
-            del loss
+            # loss_recorder.update(loss.detach(), valid_data_loader.batch_size)
+            # del loss
 
             # get joint result in patch image
             if len(devices) > 1:
@@ -135,13 +143,37 @@ def validNet(valid_data_loader, network, loss_config, result_func, loss_func, me
 
             else:
                 preds_in_patch_with_score.append(result_func(loss_config, patch_width, patch_height, preds))
-            del preds, batch_label_weight
+            # import matplotlib.pyplot as plt
+            # from mpl_toolkits.mplot3d import Axes3D
+            # fig = plt.figure()
+            # ax = fig.add_subplot(1, 2, 1)
+            # ax.imshow(image)
+            # ax = fig.add_subplot(1, 2, 2, projection='3d')
+            # ax.scatter(preds_in_patch_with_score[-1][0, :, 0], preds_in_patch_with_score[-1][0, :, 1], preds_in_patch_with_score[-1][0, :, 2])
+            # for conn in connMat:
+            #     ax.plot(preds_in_patch_with_score[-1][0, conn, 0], preds_in_patch_with_score[-1][0, conn, 1], preds_in_patch_with_score[-1][0, conn, 2], c='b')
+            # plt.show()
+            # del preds, batch_label_weight
+
+            image = np.ascontiguousarray(image)
+            for j in range(17):
+                cv2.circle(image, tuple(preds_in_patch_with_score[-1][0, j, :2].astype(int).tolist()), 5, (255, 0, 0), -1)
+            for conn in connMat:
+                cv2.line(image, tuple(preds_in_patch_with_score[-1][0, conn[0], :2].astype(int).tolist()),
+                         tuple(preds_in_patch_with_score[-1][0, conn[1], :2].astype(int).tolist()), (255, 0, 0), 3)
+            cv2.imwrite('../../output/dslr_dance1/' + '{:04d}.png'.format(idx), image[:, :, ::-1])
+            with open('../../output/dslr_dance1/' + '{:04d}.json'.format(idx), 'w') as f:
+                json.dump(preds_in_patch_with_score[-1][0, :, :3].tolist(), f)
+            # plt.imshow(image)
+            # plt.show()
 
     _p = np.asarray(preds_in_patch_with_score)
     _p = _p.reshape((_p.shape[0] * _p.shape[1], _p.shape[2], _p.shape[3]))
-    preds_in_patch_with_score = _p[0: valid_data_loader.dataset.num_samples]
+    preds_in_patch_with_score = _p
+    # preds_in_patch_with_score = _p[0: valid_data_loader.dataset.num_samples]
 
-    return preds_in_patch_with_score, loss_recorder.get_avg()
+    return preds_in_patch_with_score, None
+    # return preds_in_patch_with_score, loss_recorder.get_avg()
 
 
 def evalNet(nth_epoch, preds_in_patch_with_score, valid_data_loader, imdb, patch_width, patch_height

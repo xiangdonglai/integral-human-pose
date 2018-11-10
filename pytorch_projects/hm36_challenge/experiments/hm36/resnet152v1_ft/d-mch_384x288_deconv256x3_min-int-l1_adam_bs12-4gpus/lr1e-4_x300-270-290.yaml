@@ -1,5 +1,5 @@
 pytorch:
-  gpus: '0,1,2,3'
+  gpus: '0'
   frequent: 50
   output_path: './output/hm36/resnet152v1_ft'
   log_path: './log/hm36/resnet152v1_ft'
@@ -10,21 +10,25 @@ dataset:
    - 'mpii'
    - 'coco'
    - 'hm36_eccv_challenge'
+   - 'inthewild'
   path:
    - 'mpii'
    - 'coco'
    - 'hm36_eccv_challenge'
+   - 'inthewild'
   train_image_set:
    - 'train'
    - 'train2017'
+   - 'Train'
    - 'Train'
   test_image_set:
    - 'valid'
    - 'val2017'
    - 'Val'
+   - 'Val'
 dataiter:
-    batch_images_per_ctx: 12
-    threads: 16
+    batch_images_per_ctx: 1
+    threads: 1
     use_color_normalize: true
     mean:
     - 123.675 #- '0.485*255'
@@ -34,7 +38,7 @@ dataiter:
     - 58.395 #- '0.229*255'
     - 57.120 #- '0.224*255'
     - 57.375 #- '0.225*255'
-    target_id: 2
+    target_id: 3
 optimizer:
   lr: 0.0001
   lr_epoch_step: '270,290'

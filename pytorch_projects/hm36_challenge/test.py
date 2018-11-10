@@ -26,7 +26,7 @@ exec('from common_pytorch.blocks.' + s_config.pytorch.block + \
      ' import get_default_network_config, get_pose_net, init_pose_net')
 exec('from common_pytorch.loss.' + s_config.pytorch.loss + \
      ' import get_default_loss_config, get_loss_func, get_label_func, get_result_func, get_merge_func')
-from core.loader import hm36_eccv_challenge_Dataset, hm36_Dataset
+from core.loader import hm36_eccv_challenge_Dataset, hm36_Dataset, inthewild_Dataset
 
 
 def main():
@@ -70,11 +70,10 @@ def main():
          config.train.rect_3d_width, config.train.rect_3d_height))
 
     train_imdbs = []
-    train_imdbs.append(
-        eval(config.dataset.name[target_id])(config.dataset.train_image_set[target_id], config.dataset.path[target_id],
+    train_imdbs.append(  # H36M
+        eval(config.dataset.name[2])(config.dataset.train_image_set[2], config.dataset.path[2],
          config.train.patch_width, config.train.patch_height,
          config.train.rect_3d_width, config.train.rect_3d_height))
-
 
     batch_size = len(devices) * config.dataiter.batch_images_per_ctx
 
@@ -86,7 +85,7 @@ def main():
     test_data_loader = DataLoader(dataset=dataset_test, batch_size=batch_size, shuffle=False,
                                   num_workers=config.dataiter.threads, drop_last=False)
 
-    dataset_train = eval(config.dataset.name[target_id] + "_Dataset")(
+    dataset_train = eval(config.dataset.name[2] + "_Dataset")(   # H36M
         [train_imdbs[0]], False, s_args.detector, config.train.patch_width,
         config.train.patch_height, config.train.rect_3d_width, config.train.rect_3d_height, batch_size,
         config.dataiter.mean, config.dataiter.std, config.aug, label_func, config.loss)
@@ -96,7 +95,8 @@ def main():
     # prepare network
     assert os.path.exists(s_args.model), 'Cannot find model!'
     logger.info('Load checkpoint from {}'.format(s_args.model))
-    joint_num = dataset_test.joint_num
+    # joint_num = dataset_test.joint_num
+    joint_num = dataset_train.joint_num
     net = get_pose_net(config.network, joint_num)
     net = DataParallelModel(net).cuda()  # claim multi-gpu in CUDA_VISIBLE_DEVICES
     ckpt = torch.load(s_args.model)  # or other path/to/model
@@ -110,8 +110,8 @@ def main():
     preds_in_patch = None
     preds_in_patch, _ = validNet(test_data_loader, net, config.loss, result_func, loss_func, merge_flip_func,
                                  config.train.patch_width, config.train.patch_height, devices,
-                                 test_imdbs[0].flip_pairs, flip_test=True, flip_fea_merge=False)
-    evalNetChallenge(0, preds_in_patch, test_data_loader, test_imdbs[0], final_log_path)
+                                 test_imdbs[0].flip_pairs, flip_test=False, flip_fea_merge=False)
+    # evalNetChallenge(0, preds_in_patch, test_data_loader, test_imdbs[0], final_log_path)
     print('Testing %.2f seconds.....' % (time.time() - beginT))
 
 if __name__ == "__main__":

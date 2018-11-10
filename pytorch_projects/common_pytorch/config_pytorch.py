@@ -20,7 +20,7 @@ def parse_args():
     parser.add_argument('--model', help='path/to/model, requird when resume/test', type=str)
     # parser.add_argument('--autoresume', help='Whether resume from ckpt', default=True, type=str2bool)
     parser.add_argument('--detector', help='Path to Detector BBox file', default='', type=str)
-    parser.add_argument('--dataroot', help='Path to data root', default='/data', type=str)
+    parser.add_argument('--dataroot', help='Path to data root', default='../../data', type=str)
     args, rest = parser.parse_known_args()
     return args
 
